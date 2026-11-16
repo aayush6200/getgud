@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: GetGud web app. One Lambda behind a public Function URL plus one on-demand DynamoDB table. No always-on resources.
+Parameters:
+  TeamKey: { Type: String, NoEcho: true, Description: Key for the /team-log page }
+Resources:
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: pk, AttributeType: S }, { AttributeName: sk, AttributeType: S }]
+      KeySchema: [{ AttributeName: pk, KeyType: HASH }, { AttributeName: sk, KeyType: RANGE }]
+      TimeToLiveSpecification: { AttributeName: ttl, Enabled: true }
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: [{ Effect: Allow, Principal: { Service: lambda.amazonaws.com }, Action: "sts:AssumeRole" }]
+      ManagedPolicyArns: ["arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"]
+      Policies:
+        - PolicyName: table
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:DeleteItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:BatchWriteItem"]
+                Resource: !GetAtt Table.Arn
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties: { LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-web", RetentionInDays: 7 }
+  Fn:
+    Type: AWS::Lambda::Function
+    DependsOn: Logs
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-web"
+      Runtime: nodejs22.x
+      Handler: lambda.handler
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 15
+      Role: !GetAtt Role.Arn
+      Environment: { Variables: { STORE: dynamo, TABLE: !Ref Table, NODE_ENV: production, TEAM_KEY: !Ref TeamKey } }
+      Code: { ZipFile: "exports.handler = async () => ({ statusCode: 503, body: 'Deploying. Refresh in a moment.' });" }
+  Url:
+    Type: AWS::Lambda::Url
+    Properties: { TargetFunctionArn: !GetAtt Fn.Arn, AuthType: NONE }
+  UrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties: { FunctionName: !Ref Fn, Action: "lambda:InvokeFunctionUrl", Principal: "*", FunctionUrlAuthType: NONE }
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties: { FunctionName: !Ref Fn, Action: "lambda:InvokeFunction", Principal: "*", InvokedViaFunctionUrl: true }
+Outputs:
+  SiteUrl: { Value: !GetAtt Url.FunctionUrl }
+  Function: { Value: !Ref Fn }
