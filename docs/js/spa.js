@@ -22,13 +22,17 @@ let cur={path:"/",query:new URLSearchParams()};
 function go(url){ if(url.startsWith("/#")) url="/?to="+url.slice(2); const h="#"+url; if(location.hash===h) route(); else location.hash=h; }
 function show(title,body,opt){
   opt=opt||{}; const html=V.layout(title,body,Object.assign({user:me(),path:cur.path},opt));
+  const paint=()=>{
   root.innerHTML=html.slice(html.indexOf("<body>")+6,html.indexOf('<script',html.indexOf("</footer>")));
   document.title=title;
   root.querySelectorAll('a[href^="/"]').forEach(a=>{const h=a.getAttribute("href"); a.setAttribute("href","#"+(h.startsWith("/#")?"/?to="+h.slice(2):h));});
   if(cur.path==="/signup"||cur.path==="/login"){const c=root.querySelector(".auth-card"); if(c) c.insertAdjacentHTML("beforeend",'<p class="small muted">Demo site. Your account is saved in this browser only, so it will not appear on another device.</p>');}
   window.GG_QUERY=cur.query.toString(); window.GGApp.init(opt.boot||{});
   const to=cur.query.get("to"), el=to&&document.getElementById(to);
-  if(el) el.scrollIntoView(); else if(!opt.keep) window.scrollTo(0,0);
+  if(el) el.scrollIntoView(); else if(!opt.keep) window.scrollTo({top:0,behavior:"instant"});
+  };
+  if(!document.startViewTransition||opt.keep||matchMedia("(prefers-reduced-motion:reduce)").matches) return paint();
+  const t=document.startViewTransition(paint); [t.ready,t.finished,t.updateCallbackDone].forEach(p=>p.catch(()=>{})); // cross-fade between pages
 }
 const needUser=()=>{ if(me()) return true; go("/login?next="+encodeURIComponent(cur.path)); return false; };
 const needProfile=()=>{ if(!needUser()) return false; const p=prof(me()); if(p&&G.complete(p.a)) return true; go("/onboarding"); return false; };

@@ -9,13 +9,42 @@ const debounce=(fn,ms)=>{let t; return (...a)=>{clearTimeout(t); t=setTimeout(()
 const ava=(p,lg)=>`<div class="ava ${lg?"lg":""}" aria-hidden="true">${G.initials(p.name)}</div>`;
 const kindTag=p=>p.kind==="perf"?'<span class="tag">Performance coach</span>':p.meds?'<span class="tag good">Psychiatrist · can prescribe</span>':p.kind==="both"?'<span class="tag good">Licensed + CMPC</span>':'<span class="tag good">Licensed clinician</span>';
 
+/* ---- motion helpers ---- */
+const reduced=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion:reduce)").matches);
+const SPRING="cubic-bezier(.32,.72,0,1)", OUT="cubic-bezier(.16,1,.3,1)", BOUNCE="cubic-bezier(.34,1.56,.64,1)";
+const pop=el=>{if(el&&!reduced&&el.animate) el.animate([{transform:"scale(.9)"},{transform:"scale(1)"}],{duration:450,easing:BOUNCE});};
+const buzz=()=>{try{if(navigator.vibrate) navigator.vibrate(8);}catch(e){}};
+const paintRanges=()=>document.querySelectorAll("input[type=range]").forEach(r=>r.style.setProperty("--p",(r.value-r.min)/((r.max-r.min)||1)));
+function count(b){const m=b.textContent.match(/^(\d+(?:\.\d+)?)(\D*)$/); if(!m) return; const to=+m[1], dp=(m[1].split(".")[1]||"").length, t0=performance.now();
+  const f=t=>{const k=Math.min(1,Math.max(0,(t-t0)/1200)); b.textContent=(to*(1-Math.pow(1-k,4))).toFixed(dp)+m[2]; if(k<1) requestAnimationFrame(f);}; requestAnimationFrame(f);}
+function reveal(){ if(reduced||!("IntersectionObserver" in window)) return; // sections ease in as they scroll into view
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting) return; const el=e.target; io.unobserve(el); el.classList.add("in");
+    const b=el.matches(".stat")&&el.querySelector("b"); if(b) count(b); setTimeout(()=>el.classList.remove("rv","in"),1500);}),{rootMargin:"0px 0px -6% 0px"});
+  document.querySelectorAll(".band .stat,.how>li,.help,.band .big,.two-col .card").forEach(el=>{el.style.setProperty("--d",Array.prototype.indexOf.call(el.parentNode.children,el)%4); el.classList.add("rv"); io.observe(el);}); }
+function tilt(){const c=$(".hero-card"); if(!c||reduced||!matchMedia("(hover:hover)").matches) return; const h=c.parentNode, cl=v=>Math.max(-.5,Math.min(.5,v));
+  h.addEventListener("pointermove",e=>{const r=c.getBoundingClientRect(); c.style.transform=`perspective(1200px) rotateY(${cl((e.clientX-r.left)/r.width-.5)*5}deg) rotateX(${-cl((e.clientY-r.top)/r.height-.5)*5}deg)`;});
+  h.addEventListener("pointerleave",()=>{c.style.transform="";});}
+function flip(fn){ // match cards glide to their new rank instead of jumping
+  const old=new Map(); if(!reduced) document.querySelectorAll("#results .match").forEach(m=>old.set(m.dataset.id,{top:m.getBoundingClientRect().top,w:Array.from(m.querySelectorAll(".hp i"),i=>i.style.width)}));
+  fn(); if(reduced||!document.body.animate) return;
+  document.querySelectorAll("#results .match").forEach(m=>{const o=old.get(m.dataset.id);
+    if(!o){ if(old.size) m.animate([{opacity:0,transform:"scale(.96)"},{opacity:1,transform:"none"}],{duration:380,easing:OUT}); return; }
+    const dy=o.top-m.getBoundingClientRect().top; if(Math.abs(dy)>1) m.animate([{transform:`translateY(${dy}px)`},{transform:"none"}],{duration:520,easing:SPRING});
+    m.querySelectorAll(".hp i").forEach((i,k)=>{const a=o.w[k], b=i.style.width; if(a&&a!==b) i.animate([{width:a},{width:b}],{duration:420,easing:OUT});}); }); }
+
 let wired=false;
 function init(boot){
 const app=document.getElementById("app");
 /* ---- site-wide ---- */
-const burger=$(".burger"); if(burger) burger.addEventListener("click",()=>{const open=burger.getAttribute("aria-expanded")!=="true"; burger.setAttribute("aria-expanded",open); $("#nav").classList.toggle("open",open);});
+const burger=$(".burger"); if(burger) burger.addEventListener("click",()=>{const open=burger.getAttribute("aria-expanded")!=="true"; burger.setAttribute("aria-expanded",open); $("#nav").classList.toggle("open",open); document.documentElement.classList.toggle("lock",open);});
 if(!wired) document.addEventListener("click",e=>{const b=e.target.closest("[data-showpw]"); if(!b) return; const i=document.getElementById(b.dataset.showpw); const show=i.type==="password"; i.type=show?"text":"password"; b.textContent=show?"Hide":"Show";});
 const barf=()=>{const bar=$(".bar"); if(bar) bar.classList.toggle("scrolled",window.scrollY>8);}; barf(); if(!wired) window.addEventListener("scroll",barf,{passive:true});
+if(!wired){
+  new MutationObserver(paintRanges).observe(document.body,{childList:true,subtree:true});
+  document.addEventListener("input",e=>{if(e.target.type==="range") paintRanges();});
+  document.addEventListener("click",e=>{if(e.target.closest(".chip,.slot,.day,.opt,.seg button,.persona,.tabs a")) buzz();});
+}
+document.documentElement.classList.remove("lock"); paintRanges(); reveal(); tilt();
 wired=true;
 
 /* ---- provider directory filters ---- */
@@ -41,7 +70,7 @@ function toggleChip(t){const f=t.dataset.field,val=t.dataset.val;
 
 /* =========================== QUESTIONNAIRE =========================== */
 if(boot.page==="onboarding"){
-  let step=0, err="", busy=false;
+  let step=0, err="", busy=false, dir="";
   const view=()=>{const a=A,s=step; let body="";
    if(s===0) body=`
     <h2>Where you are and how you want to talk</h2>
@@ -86,13 +115,13 @@ if(boot.page==="onboarding"){
     <div class="q"><p class="ql">What style suits you?</p>${chips("style",{any:"No preference",structured:"Structured, with drills and homework",talk:"Open conversation"},false)}</div>`;
    return `<div class="stack-lg">
     <div class="stack" style="gap:10px"><p class="eyebrow">Athlete questionnaire · part ${s+1} of 4</p><div class="steps" aria-hidden="true">${[0,1,2,3].map(i=>`<span class="${i<=s?"on":""}"></span>`).join("")}</div></div>
-    <div class="card stack-lg qcard">${body}
+    <div class="card stack-lg qcard ${dir}">${body}
      ${err?`<p class="err" role="alert">${esc(err)}</p>`:""}
      <div class="row spread">${s===0?(boot.editing?`<a class="btn" href="/matches">Cancel</a>`:`<span></span>`):`<button class="btn" data-act="back">Back</button>`}<button class="btn primary" data-act="next" ${busy?"disabled":""}>${s===3?(busy?"Saving…":"Show my matches"):"Continue"}</button></div>
     </div>
     ${s===0&&!boot.editing?`<details class="samples"><summary>Just exploring? Fill it in with a sample athlete</summary><div class="personas">${G.PERSONAS.map((x,i)=>`<button class="persona" data-act="persona" data-i="${i}"><span class="ava" aria-hidden="true">${x.acct.name[0]}</span><span><b>${esc(x.label)}</b><br><span class="muted small">${esc(x.sub)}</span></span></button>`).join("")}</div></details>`:""}
    </div>`;};
-  const render=keep=>{app.innerHTML=view(); if(!keep) window.scrollTo(0,0);};
+  const render=keep=>{app.innerHTML=view(); dir=""; if(!keep) window.scrollTo({top:0,behavior:"instant"});};
   const validate=()=>{const a=A;
     if(step===0){ if(!a.state) return "Choose where you live so we can check licensing."; if(!a.formats.length) return "Pick at least one way to meet."; }
     if(step===1){ if(!a.level) return "Pick where you are competing right now."; if(!a.games.length) return "Pick at least one game."; }
@@ -101,9 +130,12 @@ if(boot.page==="onboarding"){
   const finish=()=>{busy=true; err=""; render(true); post("/api/profile",{a:A,resetCare:true}).then(()=>{nav("/matches");}).catch(e=>{busy=false; err=e.message; render(true);});};
   app.addEventListener("click",e=>{const t=e.target.closest("[data-act]"); if(!t) return;
     switch(t.dataset.act){
-      case "chip": toggleChip(t); err=""; render(true); break;
-      case "back": err=""; step--; render(); break;
-      case "next": err=validate(); if(err){render(true); break;} if(step<3){step++; render();} else finish(); break;
+      case "chip": { toggleChip(t); const f=t.dataset.field, sel=c=>t.dataset.multi==="1"?A[f].includes(c.dataset.val):A[f]===c.dataset.val;
+        if(err||f==="concerns"||f==="crisis"){ err=""; render(true); pop(app.querySelector('.chip[data-field="'+f+'"][data-val="'+t.dataset.val+'"]')); } // these change what is on the page
+        else t.parentNode.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed",sel(c)));
+        break; }
+      case "back": err=""; step--; dir="bwd"; render(); break;
+      case "next": err=validate(); if(err){render(true); break;} if(step<3){step++; dir="fwd"; render();} else finish(); break;
       case "persona": A=G.cleanAnswers(G.PERSONAS[+t.dataset.i].a); step=3; finish(); break;
     }});
   app.addEventListener("input",e=>{const t=e.target; if(!t.dataset.bind) return; A[t.dataset.bind]=t.type==="range"?+t.value:t.value; if(t.dataset.out) document.getElementById(t.dataset.out).textContent=(t.dataset.prefix||"")+t.value+(t.dataset.suffix||"");});
@@ -131,7 +163,7 @@ if(boot.page==="matches"){
    if(!ranked.length) h+=`<div class="card stack"><h3>No one fits these settings yet</h3><p class="muted">${A.state==="INTL"?"Our sample clinicians are licensed in the US only. Performance coaches can work with you anywhere.":"Every sample provider was ruled out by licensing, language, or session format."}</p>
      <div class="row">${cm.mode==="clinical"?`<button class="btn" data-act="care" data-val="either">Include performance coaches</button>`:""}<a class="btn" href="/onboarding">Change my answers</a></div>
      <p class="small muted">If you need to talk to someone today, the <a href="/crisis">crisis page</a> lists free lines.</p></div>`;
-   h+=ranked.map((r,i)=>`<article class="match ${i===0?"first":""}">
+   h+=ranked.map((r,i)=>`<article class="match ${i===0?"first":""}" data-id="${r.p.id}">
      ${ava(r.p)}
      <div class="grow"><p class="rank">${i===0?'<span class="best">Best fit</span>':"#"+(i+1)}</p>
       <h3><a href="/providers/${r.p.id}">${esc(r.p.name)}</a> <span class="pro">${r.p.pro}</span></h3>
@@ -156,7 +188,7 @@ if(boot.page==="matches"){
     <aside class="side stack">
      <div class="card stack">
       <div><h3>Type of care</h3><p class="small muted">${esc(cm.why)}</p></div>
-      <div class="seg" role="group" aria-label="Type of care">${[["clinical","Licensed"],["either","Both"],["perf","Coaching"]].map(([k,l])=>`<button data-act="care" data-val="${k}" aria-pressed="${cm.mode===k}">${l}</button>`).join("")}</div>
+      <div class="seg" role="group" aria-label="Type of care"><i class="thumb" style="--i:${["clinical","either","perf"].indexOf(cm.mode)}"></i>${[["clinical","Licensed"],["either","Both"],["perf","Coaching"]].map(([k,l])=>`<button data-act="care" data-val="${k}" aria-pressed="${cm.mode===k}">${l}</button>`).join("")}</div>
       ${override&&override!==auto?`<button class="btn ghost" data-act="care" data-val="">Use GetGud's recommendation</button>`:""}
      </div>
      <div class="card stack">
@@ -173,12 +205,14 @@ if(boot.page==="matches"){
     </aside>
     <section class="stack" id="results" aria-live="polite">${r.html}</section>
    </div></div>`;};
-  const render=()=>{app.innerHTML=view();};
-  const refresh=()=>{const r=results(); $("#results").innerHTML=r.html; $("#headline").textContent=boot.name+", "+(r.n===1?"1 provider fits":r.n+" providers fit")+".";};
+  const render=()=>flip(()=>{app.innerHTML=view();});
+  const refresh=()=>flip(()=>{const r=results(); $("#results").innerHTML=r.html; $("#headline").textContent=boot.name+", "+(r.n===1?"1 provider fits":r.n+" providers fit")+".";});
   app.addEventListener("click",e=>{const t=e.target.closest("[data-act]"); if(!t) return;
     switch(t.dataset.act){
       case "chip": toggleChip(t); t.setAttribute("aria-pressed",A.times.includes(t.dataset.val)); refresh(); saveAnswers(); break;
-      case "care": override=t.dataset.val||null; render(); savePrefs(); break;
+      case "care": { const th=$(".seg .thumb"), was=th?th.style.getPropertyValue("--i"):null; override=t.dataset.val||null; render(); savePrefs();
+        const nt=$(".seg .thumb"); if(nt&&was!=null){const to=nt.style.getPropertyValue("--i"); nt.style.transition="none"; nt.style.setProperty("--i",was); nt.offsetWidth; nt.style.transition=""; nt.style.setProperty("--i",to);} // slide from the old choice
+        break; }
       case "resetw": W=G.DEFAULT_W(); render(); savePrefs(); break;
       case "toggleEx": showEx=!showEx; refresh(); break;
       case "clearcmp": compare=[]; refresh(); break;
@@ -229,8 +263,9 @@ if(boot.page==="book"){
       <p class="small muted">Prototype: no payment is taken and no real appointment is made.</p>
      </section>
     </div></div>`;};
-  const render=()=>{app.innerHTML=view();};
-  app.addEventListener("click",e=>{const t=e.target.closest("[data-act]"); if(!t) return; const val=t.dataset.val; err="";
+  const render=()=>{const d=$(".days"), x=d?d.scrollLeft:null; app.innerHTML=view(); const n=$(".days"); if(!n) return;
+    if(x!=null) n.scrollLeft=x; else {const on=n.querySelector('[aria-pressed="true"]'); if(on) n.scrollLeft=on.offsetLeft-n.offsetLeft-12;}}; // keep the day strip where the player left it
+  app.addEventListener("click",e=>{const t=e.target.closest("[data-act]"); if(!t) return; const val=t.dataset.val, act=t.dataset.act; err="";
     switch(t.dataset.act){
       case "stype": pk.type=val; break;
       case "sfmt": pk.fmt=val; break;
@@ -238,7 +273,8 @@ if(boot.page==="book"){
       case "slot": pk.slot=+val; break;
       case "confirm": if(pk.slot==null||busy) return; busy=true; render();
         post("/api/book",{pid:p.id,day:pk.day,hour:pk.slot,type:pk.type,fmt:pk.fmt,reschedule:re?re.id:null}).then(j=>{nav("/booking/"+j.id);}).catch(x=>{busy=false; err=x.message; if(/took that time/.test(err)){taken.add(pk.day+"|"+pk.slot); pk.slot=null;} render();}); return;
-    } render();});
+    } render(); pop(app.querySelector('[data-act="'+act+'"][data-val="'+val+'"]'));
+    if(act==="day"){const g=$(".slots"); if(g) g.classList.add("stag");} if(act==="slot") $(".summary").classList.add("ping");});
   render();
 }
 }

@@ -23,8 +23,11 @@ exports.layout = (title, body, o = {}) => {
   const right = u
     ? `<a class="btn ghost" href="/account"${at("/account")}><span class="ava xs" aria-hidden="true">${esc(u.name[0].toUpperCase())}</span>${esc(u.name)}</a><form method="post" action="/logout"><button class="btn sm">Sign out</button></form>`
     : `<a class="btn ghost" href="/login">Sign in</a><a class="btn primary sm" href="/signup">Get started</a>`;
+  const tab = (href, label, d) => `<a href="${href}"${at(href)}><svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>${label}</a>`;
+  const tabs = u ? `<nav class="tabs" aria-label="Quick navigation">${tab("/dashboard", "Home", '<path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>')}${tab("/matches", "Matches", '<path d="M5 20V11M12 20V4M19 20v-6"/>')}${tab("/providers", "Providers", '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>')}${tab("/account", "Account", '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1-4 4-5.5 7.5-5.5s6.5 1.5 7.5 5.5"/>')}</nav>` : "";
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme:light)"><meta name="theme-color" content="#000000" media="(prefers-color-scheme:dark)">
 <title>${esc(title)}</title>
 <meta name="description" content="GetGud matches esports athletes with therapists and mental performance coaches who understand competitive play.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,7 +47,7 @@ exports.layout = (title, body, o = {}) => {
   <div><h4>Players</h4><a href="/signup">Get started</a><a href="/providers">Find a provider</a><a href="/#how">How it works</a><a href="/login">Sign in</a></div>
   <div><h4>Organizations</h4><a href="/teams">For teams and schools</a><a href="/research">The research</a></div>
   <div><h4>Safety</h4><a href="/crisis">Crisis help</a><a href="/privacy">Privacy</a></div>
-</div><div class="wrap"><p class="small muted fine">Prototype. Every provider shown is a fictional sample, and no real sessions or payments take place. GetGud is not an emergency service. In the US, call or text 988 any time.</p></div></footer>
+</div><div class="wrap"><p class="small muted fine">Prototype. Every provider shown is a fictional sample, and no real sessions or payments take place. GetGud is not an emergency service. In the US, call or text 988 any time.</p></div></footer>${tabs}
 ${o.boot ? `<script id="boot" type="application/json">${JSON.stringify(o.boot).replace(/</g, "\\u003c")}</script>` : ""}
 <script src="/js/gg.js"></script><script src="/js/app.js"></script>
 </body></html>`;
@@ -225,7 +228,7 @@ exports.booking = (b, user, profile, top, m) => {
   const REM = { email: "Email to " + user.email, sms: "Text message", discord: "Discord DM" };
   return `<div class="narrow wide stack-lg">
   <div class="card stack-lg ${active ? "confirmed" : ""}">
-   <div class="stack" style="gap:6px"><p class="eyebrow">${active ? "Booking confirmed" : "Booking " + esc(b.status)}</p><h1>${active ? `GG, ${esc(user.name)}. You are booked.` : "This session is no longer on your calendar."}</h1>${active ? `<p class="muted">Reaching out is the hard part. That is done.</p>` : ""}</div>
+   <div class="stack" style="gap:6px">${active ? '<svg class="tick" viewBox="0 0 56 56" aria-hidden="true" style="margin-bottom:10px"><circle cx="28" cy="28" r="28"/><path d="M17 29l8 8 15-17"/></svg>' : ""}<p class="eyebrow">${active ? "Booking confirmed" : "Booking " + esc(b.status)}</p><h1>${active ? `GG, ${esc(user.name)}. You are booked.` : "This session is no longer on your calendar."}</h1>${active ? `<p class="muted">Reaching out is the hard part. That is done.</p>` : ""}</div>
    <div class="row" style="gap:18px;align-items:flex-start">${ava(p, true)}
     <dl class="kv grow"><dt>With</dt><dd><a href="/providers/${p.id}">${esc(p.name)}</a>, ${esc(p.cred)}</dd><dt>When</dt><dd>${when(b)}</dd>
      <dt>Session</dt><dd>${b.type === "intro" ? "Intro call, 15 minutes" : "Full session, 50 minutes"} by ${GG.FORMATS[b.fmt].toLowerCase()}</dd><dt>Cost</dt><dd>${cost(b, p, a)}</dd>

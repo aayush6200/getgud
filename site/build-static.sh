@@ -7,7 +7,8 @@ cp public/css/site.css "$OUT/css/"; cp shared/gg.js public/js/app.js static/spa.
 { echo 'window.GGViews=(function(){var module={exports:{}},exports=module.exports;var require=function(){return window.GG};'; cat views.js; echo 'return module.exports;})();'; } > "$OUT/js/views.js"
 cat > "$OUT/index.html" <<'HTML'
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme:light)"><meta name="theme-color" content="#000000" media="(prefers-color-scheme:dark)">
 <title>GetGud · Mental health support for esports athletes</title>
 <meta name="description" content="GetGud matches esports athletes with therapists and mental performance coaches who understand competitive play.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
