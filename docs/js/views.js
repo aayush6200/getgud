@@ -2,7 +2,8 @@ window.GGViews=(function(){var module={exports:{}},exports=module.exports;var re
 // Server-rendered pages. Interactive screens (questionnaire, matches, booking) mount client code from /js/app.js.
 const GG = require("./shared/gg.js");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const ava = (p, lg) => `<div class="ava ${lg ? "lg" : ""}" aria-hidden="true">${GG.initials(p.name)}</div>`;
+const BASE = typeof window !== "undefined" && window.GG_STATIC ? "" : "/"; // the static build lives under a sub-path
+const ava = (p, lg) => `<div class="ava ${lg ? "lg" : ""} t${p.id % 6}" aria-hidden="true"><img src="${BASE}img/p${p.id}.svg" alt="" width="52" height="52"></div>`;
 const kindTag = p => p.kind === "perf" ? '<span class="tag">Performance coach</span>' : p.meds ? '<span class="tag good">Psychiatrist · can prescribe</span>' : p.kind === "both" ? '<span class="tag good">Licensed + CMPC</span>' : '<span class="tag good">Licensed clinician</span>';
 const first = p => p.name.replace(/^Dr\. /, "").split(" ")[0];
 const ext = (href, label) => `<a href="${href}" target="_blank" rel="noopener">${label}</a>`;
@@ -28,11 +29,11 @@ exports.layout = (title, body, o = {}) => {
   const tabs = u ? `<nav class="tabs" aria-label="Quick navigation">${tab("/dashboard", "Home", '<path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>')}${tab("/matches", "Matches", '<path d="M5 20V11M12 20V4M19 20v-6"/>')}${tab("/providers", "Providers", '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>')}${tab("/account", "Account", '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c1-4 4-5.5 7.5-5.5s6.5 1.5 7.5 5.5"/>')}</nav>` : "";
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme:light)"><meta name="theme-color" content="#000000" media="(prefers-color-scheme:dark)">
+<meta name="theme-color" content="#0c1310"><meta name="color-scheme" content="light">
 <title>${esc(title)}</title>
 <meta name="description" content="GetGud matches esports athletes with therapists and mental performance coaches who understand competitive play.">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/css/site.css">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230B7D72'/%3E%3Crect x='6' y='12' width='20' height='8' rx='4' fill='%23fff'/%3E%3Crect x='6' y='12' width='13' height='8' rx='4' fill='%23F2BE55'/%3E%3C/svg%3E">
 </head><body>
@@ -48,7 +49,7 @@ exports.layout = (title, body, o = {}) => {
   <div><h4>Players</h4><a href="/signup">Get started</a><a href="/providers">Find a provider</a><a href="/#how">How it works</a><a href="/login">Sign in</a></div>
   <div><h4>Organizations</h4><a href="/teams">For teams and schools</a><a href="/research">The research</a></div>
   <div><h4>Safety</h4><a href="/crisis">Crisis help</a><a href="/privacy">Privacy</a></div>
-</div><div class="wrap"><p class="small muted fine">Prototype. Every provider shown is a fictional sample, and no real sessions or payments take place. GetGud is not an emergency service. In the US, call or text 988 any time.</p></div></footer>${tabs}
+</div><div class="wrap"><p class="small muted fine">Prototype. Every provider shown is a fictional sample, and no real sessions or payments take place. GetGud is not an emergency service. In the US, call or text 988 any time.</p></div><div class="foot-mark" aria-hidden="true">GetGud</div></footer>${tabs}
 ${o.boot ? `<script id="boot" type="application/json">${JSON.stringify(o.boot).replace(/</g, "\\u003c")}</script>` : ""}
 <script src="/js/gg.js"></script><script src="/js/app.js"></script>
 </body></html>`;
@@ -56,33 +57,47 @@ ${o.boot ? `<script id="boot" type="application/json">${JSON.stringify(o.boot).r
 
 /* ---------- landing ---------- */
 exports.home = (user) => {
-  const kai = GG.cleanAnswers(GG.PERSONAS[0].a), top = GG.runMatch(kai).ranked.slice(0, 2);
+  const kai = GG.cleanAnswers(GG.PERSONAS[0].a), [r1, r2] = GG.runMatch(kai).ranked;
   const cta = user ? `<a class="btn primary lg" href="/dashboard">Go to your dashboard</a>` : `<a class="btn primary lg" href="/signup">Find my match</a><a class="btn lg" href="/providers">Browse providers</a>`;
   const helps = [["tilt", "Tilt that ruins the next three maps"], ["perf", "Freezing when the match is on the line"], ["burnout", "Burnout after months of grinding"], ["sleep", "Sleep wrecked by late scrims"], ["team", "A roster that stopped talking"], ["toxicity", "Harassment in chat and voice"], ["transition", "Life after competitive play"], ["mood", "Feeling low and not knowing why"]];
+  const games = Object.values(GG.GAMES).filter(g => g !== "Other").map(g => `<span>${esc(g)}</span>`).join("");
+  const lic = GG.P.filter(p => p.kind !== "perf"), coach = GG.P.filter(p => p.kind !== "clinical");
+  const faces = (list, label) => `<div class="faces">${list.slice(0, 4).map(p => ava(p)).join("")}<small>${list.length} ${label}</small></div>`;
+  const hcard = (r, front) => `<article class="hcard ${front ? "front" : "back"}">
+      <div class="hrow">${ava(r.p)}<div class="grow">${front ? '<span class="best">Best fit</span>' : ""}<b>${esc(r.p.name)}</b><span class="small muted">${esc(r.p.cred)}</span></div><div class="hfit"><b>${r.total}</b><span>% fit</span></div></div>
+      <div class="hp"><i style="width:${r.total}%"></i></div>
+      <ul class="why">${r.why.slice(0, 3).map(w => `<li>${esc(w)}</li>`).join("")}</ul>
+      <div class="hrow"><span class="small muted grow">Next opening<br><b class="small">${GG.nextOpen(r.p, new Set())}</b></span><span class="pillbtn">Book free intro</span></div>
+    </article>`;
   return `
-<section class="band hero-band"><div class="wrap hero">
-  <div class="stack" style="gap:20px">
+<section class="dark hero-band"><div class="wrap hero">
+  <div class="stack" style="gap:26px">
     <p class="eyebrow">Mental health support for esports athletes</p>
-    <h1>Talk to someone who gets the game.</h1>
-    <p class="lede">GetGud matches competitive players with licensed therapists and certified mental performance coaches who understand scrims, ranked anxiety, and roster drama. Answer a few questions, see who fits and why, and book a first session.</p>
+    <h1>Talk to someone who <em>gets</em> the game.</h1>
+    <p class="lede">GetGud matches competitive players with licensed therapists and certified mental performance coaches who understand scrims, ranked anxiety, and roster drama.</p>
     <div class="row">${cta}</div>
-    <p class="small muted">Free to sign up. Most providers offer a free 15-minute intro call.</p>
+    <ul class="trust"><li>Licensed where you live</li><li>Free 15-minute intro</li><li>Your team never knows</li></ul>
   </div>
-  <div class="hero-card" aria-label="Example of a match result">
-    <p class="eyebrow">Example: Kai, collegiate Valorant IGL</p>
-    ${top.map((r, i) => `<div class="mini ${i === 0 ? "first" : ""}">${ava(r.p)}<div class="grow"><b>${esc(r.p.name)}</b><br><span class="small muted">${esc(r.p.cred)}</span><ul class="why">${r.why.slice(0, 2).map(w => `<li>${esc(w)}</li>`).join("")}</ul></div><div class="fit"><div><b>${r.total}%</b><span>fit</span></div></div></div>`).join("")}
-    <p class="small muted">Sample providers. Your own ranking is built from your answers.</p>
+  <div class="stage hero-card" aria-label="Example of a match result">
+    <div class="float f1"><i></i>Kai · collegiate Valorant IGL · tilt</div>
+    <div class="deck">${hcard(r2, false)}${hcard(r1, true)}</div>
+    <div class="float f2"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3L13 4.5"/></svg>Booked · Thursday 7:00 PM</div>
   </div>
 </div></section>
 
-<section class="band"><div class="wrap stats">
-  <div class="stat"><b>78.7%</b><p>of 72 professional FPS players showed signs of anxiety or depression on a standard screening questionnaire.</p>${ext("https://eprints.chi.ac.uk/id/eprint/7278/", "Birch et al., 2022")}</div>
-  <div class="stat"><b>3–10 hrs</b><p>of practice a day among collegiate players. More than half reported eye fatigue, and a third wrist pain.</p>${ext("https://doi.org/10.1136/bmjsem-2018-000467", "DiFrancisco-Donoghue et al., 2019")}</div>
-  <div class="stat"><b>260+</b><p>schools field collegiate esports programs in North America. Team psychologists are mostly found at the top professional organizations.</p>${ext("https://en.wikipedia.org/wiki/National_Association_of_Collegiate_Esports", "NACE, 2024")}</div>
+<div class="marquee" aria-hidden="true"><div>${games}${games}</div></div>
+
+<section class="sec"><div class="wrap">
+  <div class="sec-head"><p class="eyebrow">Why this exists</p><h2 class="big">High pressure. <em>Thin support.</em></h2></div>
+  <div class="stats">
+    <div class="stat"><b>78.7%</b><p>of 72 professional FPS players showed signs of anxiety or depression on a standard screening questionnaire.</p>${ext("https://eprints.chi.ac.uk/id/eprint/7278/", "Birch et al., 2022")}</div>
+    <div class="stat"><b>3–10 hrs</b><p>of practice a day among collegiate players. More than half reported eye fatigue, and a third wrist pain.</p>${ext("https://doi.org/10.1136/bmjsem-2018-000467", "DiFrancisco-Donoghue et al., 2019")}</div>
+    <div class="stat"><b>260+</b><p>schools field collegiate esports programs in North America. Team psychologists are mostly found at the top professional organizations.</p>${ext("https://en.wikipedia.org/wiki/National_Association_of_Collegiate_Esports", "NACE, 2024")}</div>
+  </div>
 </div></section>
 
-<section class="band alt" id="how"><div class="wrap stack-lg">
-  <div class="stack" style="gap:8px"><p class="eyebrow">How it works</p><h2 class="big">From struggling to a booked session in about five minutes.</h2></div>
+<section class="sec tint" id="how"><div class="wrap split">
+  <div class="sec-head sticky"><p class="eyebrow">How it works</p><h2 class="big">Struggling to booked in <em>five minutes.</em></h2><p class="muted">No waiting room, no phone tag. You can stop halfway and come back.</p></div>
   <ol class="how">
     <li><b>Create an account</b>Your answers are saved to your account so you can come back, change them, and rebook.</li>
     <li><b>Tell us how you play</b>Game, level, schedule, budget, and what is getting in the way.</li>
@@ -91,28 +106,27 @@ exports.home = (user) => {
   </ol>
 </div></section>
 
-<section class="band"><div class="wrap stack-lg">
-  <div class="stack" style="gap:8px"><p class="eyebrow">What players come for</p><h2 class="big">Problems a coach alone cannot fix.</h2></div>
-  <div class="helps">${helps.map(([k, t]) => `<a class="help" href="/providers?concern=${k}"><b>${esc(t)}</b><span class="small muted">See who works with ${GG.SHORT[k]}</span></a>`).join("")}</div>
+<section class="sec"><div class="wrap">
+  <div class="sec-head"><p class="eyebrow">What players come for</p><h2 class="big">Problems a coach alone <em>cannot fix.</em></h2></div>
+  <div class="helps">${helps.map(([k, t]) => `<a class="help" href="/providers?concern=${k}"><b>${esc(t)}</b><span>${GG.SHORT[k]}</span></a>`).join("")}</div>
 </div></section>
 
-<section class="band alt"><div class="wrap two-col">
-  <div class="stack"><p class="eyebrow">Two kinds of help</p><h2 class="big">We send you to the right kind of professional.</h2>
-    <p class="muted">Depression, anxiety, and insomnia need a licensed clinician. Composure and focus can be trained by a certified coach. GetGud reads your answers and routes you, and tells you why.</p></div>
-  <div class="stack">
-    <div class="card"><h3>Licensed clinicians</h3><p class="muted">Psychologists, counselors, clinical social workers, and psychiatrists. They can diagnose and treat mental health conditions. We only show ones licensed where you live.</p></div>
-    <div class="card"><h3>Mental performance coaches</h3><p class="muted">Certified Mental Performance Consultants. They train skills like reset routines and focus under pressure. They cannot treat a mental health condition.</p></div>
+<section class="sec dark block"><div class="wrap">
+  <div class="sec-head"><p class="eyebrow">Two kinds of help</p><h2 class="big">We route you to the <em>right</em> professional.</h2><p class="lede">GetGud reads your answers, picks the kind of care that fits, and tells you why.</p></div>
+  <div class="kinds">
+    <div class="kind"><p class="eyebrow">Licensed</p><h3>Clinicians</h3><p>Psychologists, counselors, clinical social workers, and psychiatrists. They can diagnose and treat conditions like depression, anxiety, and insomnia. We only show ones licensed where you live.</p>${faces(lic, "sample clinicians")}</div>
+    <div class="kind lime"><p class="eyebrow">Certified</p><h3>Performance coaches</h3><p>Certified Mental Performance Consultants. They train skills like reset routines and focus under pressure. They cannot treat a mental health condition.</p>${faces(coach, "sample coaches")}</div>
   </div>
 </div></section>
 
-<section class="band"><div class="wrap two-col">
-  <div class="stack"><p class="eyebrow">Privacy</p><h2 class="big">Your team never finds out.</h2>
+<section class="sec"><div class="wrap split">
+  <div class="sec-head"><p class="eyebrow">Privacy</p><h2 class="big">Your team <em>never</em> finds out.</h2>
     <p class="muted">A provider sees your answers only after you book with them. When a team or school pays through a program code, it receives a count of sessions used and no names. We do not share questionnaire answers with advertisers.</p>
     <p><a href="/privacy">Read the privacy page</a></p></div>
-  <div class="card stack"><p class="eyebrow">For teams, schools, and communities</p><h3>Cover your players' sessions</h3><p class="muted">Partner organizations get a program code. Their players book at no cost and providers are paid a full rate.</p><div><a class="btn" href="/teams">See how partnering works</a></div></div>
+  <div class="card stack teamcard"><p class="eyebrow">For teams, schools, and communities</p><h3>Cover your players' sessions</h3><p class="muted">Partner organizations get a program code. Their players book at no cost and providers are paid a full rate.</p><p class="code">${GG.CODE}<span>sample code</span></p><div><a class="btn" href="/teams">See how partnering works</a></div></div>
 </div></section>
 
-<section class="band cta-band"><div class="wrap stack" style="align-items:flex-start"><h2 class="big">Ready when you are.</h2><p>It takes about five minutes, and you can stop and come back.</p><div class="row">${cta}</div></div></section>`;
+<section class="sec lime block cta-band"><div class="wrap stack" style="align-items:center;text-align:center;gap:22px"><h2 class="huge">Ready when <em>you are.</em></h2><p>It takes about five minutes, and you can stop and come back.</p><div class="row" style="justify-content:center">${cta}</div></div></section>`;
 };
 
 /* ---------- auth ---------- */

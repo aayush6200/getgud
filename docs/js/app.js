@@ -6,7 +6,7 @@ const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const nav=u=>window.GG_NAV?window.GG_NAV(u):(location.href=u);
 const post=(url,body)=>window.GG_POST?window.GG_POST(url,body):fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(async r=>{const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||"Something went wrong. Try again."); return j;});
 const debounce=(fn,ms)=>{let t; return (...a)=>{clearTimeout(t); t=setTimeout(()=>fn(...a),ms);};};
-const ava=(p,lg)=>`<div class="ava ${lg?"lg":""}" aria-hidden="true">${G.initials(p.name)}</div>`;
+const ava=(p,lg)=>`<div class="ava ${lg?"lg":""} t${p.id%6}" aria-hidden="true"><img src="${window.GG_STATIC?"":"/"}img/p${p.id}.svg" alt="" width="52" height="52"></div>`;
 const kindTag=p=>p.kind==="perf"?'<span class="tag">Performance coach</span>':p.meds?'<span class="tag good">Psychiatrist · can prescribe</span>':p.kind==="both"?'<span class="tag good">Licensed + CMPC</span>':'<span class="tag good">Licensed clinician</span>';
 
 /* ---- motion helpers ---- */
@@ -20,7 +20,7 @@ function count(b){const m=b.textContent.match(/^(\d+(?:\.\d+)?)(\D*)$/); if(!m) 
 function reveal(){ if(reduced||!("IntersectionObserver" in window)) return; // sections ease in as they scroll into view
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting) return; const el=e.target; io.unobserve(el); el.classList.add("in");
     const b=el.matches(".stat")&&el.querySelector("b"); if(b) count(b); setTimeout(()=>el.classList.remove("rv","in"),1500);}),{rootMargin:"0px 0px -6% 0px"});
-  document.querySelectorAll(".band .stat,.how>li,.help,.band .big,.two-col .card").forEach(el=>{el.style.setProperty("--d",Array.prototype.indexOf.call(el.parentNode.children,el)%4); el.classList.add("rv"); io.observe(el);}); }
+  document.querySelectorAll(".sec .stat,.how>li,.help,.sec .big,.kind,.teamcard").forEach(el=>{el.style.setProperty("--d",Array.prototype.indexOf.call(el.parentNode.children,el)%4); el.classList.add("rv"); io.observe(el);}); }
 function tilt(){const c=$(".hero-card"); if(!c||reduced||!matchMedia("(hover:hover)").matches) return; const h=c.parentNode, cl=v=>Math.max(-.5,Math.min(.5,v));
   h.addEventListener("pointermove",e=>{const r=c.getBoundingClientRect(); c.style.transform=`perspective(1200px) rotateY(${cl((e.clientX-r.left)/r.width-.5)*5}deg) rotateX(${-cl((e.clientY-r.top)/r.height-.5)*5}deg)`;});
   h.addEventListener("pointerleave",()=>{c.style.transform="";});}
